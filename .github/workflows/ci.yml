@@ -25,10 +25,10 @@ jobs:
           pip install -e ".[guardrails-service,operator,admission-webhook,dashboard,dev]"
 
       - name: Ruff lint
-        run: ruff check .
+        run: ruff check . --output-format=github
 
       - name: Ruff format check
-        run: ruff format --check .
+        run: ruff format --check . 
 
       - name: Mypy
         run: mypy guardrails_service agent_operator admission_webhook/app dashboard/app
