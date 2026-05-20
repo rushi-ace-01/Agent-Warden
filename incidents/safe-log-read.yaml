@@ -1,0 +1,18 @@
+id: safe-log-read
+title: Routine staging log read (should be allowed)
+description: |
+  Positive control. A log-triage agent in staging reading a pod by
+  name. If this ever returns anything other than 'allow', the policy
+  has become too restrictive and the test catches it.
+request:
+  verb: get
+  resource: pod
+  target: frontend-7d9c4b
+  namespace: staging
+  agent_name: log-triage-agent
+  agent_max_irreversibility: 8
+  agent_max_blast_radius: 60
+expected:
+  verdict: allow
+  min_reasons: 0
+  must_mention: []

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: agent-warden
+description: Runtime guardrails for AI agents on Kubernetes
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/your-org/agent-warden
+sources:
+  - https://github.com/your-org/agent-warden
+keywords:
+  - ai-agents
+  - guardrails
+  - admission-webhook
+  - security
+maintainers:
+  - name: agent-warden contributors

@@ -1,0 +1,9 @@
+{
+  "verb": "get",
+  "resource": "pod",
+  "target": "frontend-7d9c4b",
+  "namespace": "staging",
+  "agent_name": "log-triage-agent",
+  "agent_max_irreversibility": 8,
+  "agent_max_blast_radius": 60
+}

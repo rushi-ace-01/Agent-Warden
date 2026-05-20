@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admission-webhook-tls
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/name: agent-warden
+    app.kubernetes.io/component: admission-webhook
+type: kubernetes.io/tls
+# tls.crt and tls.key are filled in by `make deploy` from generated certs.
+# This placeholder makes kustomize apply succeed; the real values are
+# applied via `kubectl create secret tls --dry-run | kubectl apply`.
+stringData:
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    PLACEHOLDER
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN PRIVATE KEY-----
+    PLACEHOLDER
+    -----END PRIVATE KEY-----
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admission-webhook
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/name: agent-warden
+    app.kubernetes.io/component: admission-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: admission-webhook
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-warden
+        app.kubernetes.io/component: admission-webhook
+    spec:
+      serviceAccountName: admission-webhook
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: webhook
+          image: {{ include "agent-warden.image" (dict "root" $ "component" .Values.admissionWebhook) }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: https
+              containerPort: 8443
+          env:
+            - name: GUARDRAILS_URL
+              value: http://guardrails-service.agent-warden-system.svc.cluster.local
+            - name: TLS_CERT_PATH
+              value: /tls/tls.crt
+            - name: TLS_KEY_PATH
+              value: /tls/tls.key
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 1
+            periodSeconds: 3
+      volumes:
+        - name: tls
+          secret:
+            secretName: admission-webhook-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admission-webhook
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/name: agent-warden
+    app.kubernetes.io/component: admission-webhook
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: admission-webhook
+  ports:
+    - name: https
+      port: 443
+      targetPort: https
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admission-webhook
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    app.kubernetes.io/name: agent-warden
+    app.kubernetes.io/component: admission-webhook
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: admission-webhook
+  labels:
+    app.kubernetes.io/name: agent-warden
+    app.kubernetes.io/component: admission-webhook
+rules:
+  - apiGroups: ["agent-warden.io"]
+    resources: ["blockedactions"]
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups: ["agent-warden.io"]
+    resources: ["agentactionrequests"]
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups: ["agent-warden.io"]
+    resources: ["agentactionrequests/status"]
+    verbs: ["patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admission-webhook
+  labels:
+    app.kubernetes.io/name: agent-warden
+    app.kubernetes.io/component: admission-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admission-webhook
+subjects:
+  - kind: ServiceAccount
+    name: admission-webhook
+    namespace: {{ .Values.namespace.name }}

@@ -1,0 +1,98 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: agentactionrequests.agent-warden.io
+spec:
+  group: agent-warden.io
+  scope: Namespaced
+  names:
+    plural: agentactionrequests
+    singular: agentactionrequest
+    kind: AgentActionRequest
+    shortNames:
+      - aar
+    categories:
+      - agent-warden
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [agentName, action, scores, reasons, requestedAt, expiresAt, actionHash]
+              properties:
+                agentName:
+                  type: string
+                action:
+                  type: object
+                  required: [verb, resource, target]
+                  properties:
+                    verb: { type: string }
+                    resource: { type: string }
+                    target: { type: string }
+                    namespace: { type: string }
+                actionHash:
+                  type: string
+                  description: SHA-256 of (agent + verb + resource + target + namespace). Used by the webhook to look up approvals.
+                  pattern: "^[a-f0-9]{64}$"
+                scores:
+                  type: object
+                  properties:
+                    irreversibility: { type: integer, minimum: 0, maximum: 10 }
+                    blastRadius: { type: integer, minimum: 0, maximum: 100 }
+                    colocationRisk: { type: boolean }
+                    overPermissioned: { type: boolean }
+                reasons:
+                  type: array
+                  items: { type: string }
+                requestedAt:
+                  type: string
+                  format: date-time
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: After this time the request transitions to Expired and cannot be approved.
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Pending, Approved, Denied, Expired, Consumed]
+                decidedBy:
+                  type: string
+                  description: Identity of the human (or system) that approved or denied.
+                decidedAt:
+                  type: string
+                  format: date-time
+                message:
+                  type: string
+                consumedAt:
+                  type: string
+                  format: date-time
+                  description: When the approved action was actually retried and let through.
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Agent
+          type: string
+          jsonPath: .spec.agentName
+        - name: Verb
+          type: string
+          jsonPath: .spec.action.verb
+        - name: Resource
+          type: string
+          jsonPath: .spec.action.resource
+        - name: Target
+          type: string
+          jsonPath: .spec.action.target
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Expires
+          type: date
+          jsonPath: .spec.expiresAt

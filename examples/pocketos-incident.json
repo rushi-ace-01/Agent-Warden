@@ -1,0 +1,9 @@
+{
+  "verb": "delete",
+  "resource": "pvc",
+  "target": "production-db-backup-volume",
+  "namespace": "production",
+  "agent_name": "cursor-staging-agent",
+  "agent_max_irreversibility": 4,
+  "agent_max_blast_radius": 30
+}

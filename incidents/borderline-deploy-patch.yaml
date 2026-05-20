@@ -1,0 +1,19 @@
+id: borderline-deploy-patch
+title: Borderline deployment patch in production
+description: |
+  Synthetic test of the require_approval branch. A deploy bot whose
+  declared limits are exactly at the action's scores — the policy
+  should not deny outright (the agent claims it can handle this) but
+  should require human approval because we're at the edge.
+request:
+  verb: patch
+  resource: deployment
+  target: checkout-service
+  namespace: production
+  agent_name: deploy-bot
+  agent_max_irreversibility: 6
+  agent_max_blast_radius: 60
+expected:
+  verdict: require_approval
+  min_reasons: 1
+  must_mention: []

@@ -1,0 +1,25 @@
+apiVersion: agent-warden.io/v1alpha1
+kind: ScopedAgent
+metadata:
+  name: pocketos-replay
+  namespace: agent-warden-demo
+spec:
+  task: "attempt the PocketOS-style production PVC deletion and observe the deny"
+  image: curlimages/curl:8.10.1
+  command: ["sh", "-c"]
+  args:
+    - |
+      set -e
+      echo "agent ${AGENT_NAME} attempting a destructive action..."
+      RESPONSE=$(curl -sS -X POST "${GUARDRAILS_URL}/decide" \
+        -H 'Content-Type: application/json' \
+        -d '{"verb":"delete","resource":"pvc","target":"production-db-backup-volume","namespace":"production","agent_name":"'"${AGENT_NAME}"'","agent_max_irreversibility":'"${AGENT_MAX_IRREVERSIBILITY}"',"agent_max_blast_radius":'"${AGENT_MAX_BLAST_RADIUS}"'}')
+      echo "guardrails verdict:"
+      echo "${RESPONSE}"
+      echo "${RESPONSE}" | grep -q '"verdict":"deny"' && echo "BLOCKED as expected" || (echo "UNEXPECTED ALLOW" && exit 1)
+  maxIrreversibility: 4
+  maxBlastRadius: 30
+  allowedTools: []
+  allowedEgressHosts: []
+  timeoutSeconds: 60
+  ttlSecondsAfterFinished: 300

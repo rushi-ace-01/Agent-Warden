@@ -1,0 +1,120 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: scopedagents.agent-warden.io
+spec:
+  group: agent-warden.io
+  scope: Namespaced
+  names:
+    plural: scopedagents
+    singular: scopedagent
+    kind: ScopedAgent
+    shortNames:
+      - sa
+      - sagent
+    categories:
+      - agent-warden
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [task, image, maxIrreversibility, maxBlastRadius]
+              properties:
+                task:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                  description: Human-readable description of what this agent should do.
+                image:
+                  type: string
+                  minLength: 1
+                  description: Container image the agent runs.
+                command:
+                  type: array
+                  items:
+                    type: string
+                  description: Optional override for the image's entrypoint.
+                args:
+                  type: array
+                  items:
+                    type: string
+                maxIrreversibility:
+                  type: integer
+                  minimum: 0
+                  maximum: 10
+                  description: Highest irreversibility score this agent is allowed to perform.
+                maxBlastRadius:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  description: Highest blast-radius score this agent is allowed to perform.
+                allowedTools:
+                  type: array
+                  items:
+                    type: string
+                  default: []
+                  description: Tool names this agent may call. Maps to network egress rules.
+                allowedEgressHosts:
+                  type: array
+                  items:
+                    type: string
+                  default: []
+                  description: External hostnames the agent pod may connect to.
+                timeoutSeconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 86400
+                  default: 600
+                  description: Maximum wall-clock time before the Job is terminated.
+                ttlSecondsAfterFinished:
+                  type: integer
+                  minimum: 0
+                  default: 3600
+                  description: How long to keep the completed Job before garbage collection.
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Pending, Running, Blocked, Completed, Failed]
+                jobName:
+                  type: string
+                serviceAccountName:
+                  type: string
+                message:
+                  type: string
+                startedAt:
+                  type: string
+                  format: date-time
+                completedAt:
+                  type: string
+                  format: date-time
+                observedGeneration:
+                  type: integer
+                  format: int64
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: MaxIrr
+          type: integer
+          jsonPath: .spec.maxIrreversibility
+        - name: MaxBlast
+          type: integer
+          jsonPath: .spec.maxBlastRadius
+        - name: Task
+          type: string
+          jsonPath: .spec.task
+          priority: 1
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

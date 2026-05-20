@@ -1,0 +1,60 @@
+# Default values for agent-warden.
+# Override with --set or -f values.yaml.
+
+namespace:
+  # Whether the chart should create the namespace. Set to false if managed externally.
+  create: true
+  name: agent-warden-system
+
+image:
+  registry: ""
+  pullPolicy: IfNotPresent
+  # If non-empty, applied to every component image as :tag (overriding per-component tag).
+  tag: ""
+
+guardrailsService:
+  enabled: true
+  image:
+    repository: agent-warden/guardrails-service
+    tag: dev
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
+
+operator:
+  enabled: true
+  image:
+    repository: agent-warden/agent-operator
+    tag: dev
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits:   { cpu: 200m, memory: 256Mi }
+
+admissionWebhook:
+  enabled: true
+  image:
+    repository: agent-warden/admission-webhook
+    tag: dev
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits:   { cpu: 200m, memory: 256Mi }
+  # The caBundle and TLS Secret must be provisioned out of band — either by
+  # `make deploy` (dev) or cert-manager (prod). See docs/install.md.
+  failurePolicy: Ignore
+  timeoutSeconds: 5
+
+dashboard:
+  enabled: true
+  image:
+    repository: agent-warden/dashboard
+    tag: dev
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
+
+prometheus:
+  scrape: true

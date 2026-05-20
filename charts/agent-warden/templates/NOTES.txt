@@ -1,0 +1,42 @@
+agent-warden installed!
+
+Components deployed to {{ .Values.namespace.name }}:
+{{- if .Values.guardrailsService.enabled }}
+  - guardrails-service     (policy engine, exposes /decide and /metrics)
+{{- end }}
+{{- if .Values.operator.enabled }}
+  - agent-operator         (watches ScopedAgent CRDs)
+{{- end }}
+{{- if .Values.admissionWebhook.enabled }}
+  - admission-webhook      (intercepts agent actions — requires TLS bootstrap)
+{{- end }}
+{{- if .Values.dashboard.enabled }}
+  - dashboard              (approval queue UI)
+{{- end }}
+
+{{- if .Values.admissionWebhook.enabled }}
+
+IMPORTANT: The admission webhook needs a TLS cert and the
+ValidatingWebhookConfiguration's caBundle patched. Run:
+
+  scripts/gen-webhook-certs.py --service admission-webhook \
+    --namespace {{ .Values.namespace.name }} --out-dir tls > tls/ca.b64
+  kubectl -n {{ .Values.namespace.name }} create secret tls admission-webhook-tls \
+    --cert=tls/tls.crt --key=tls/tls.key --dry-run=client -o yaml | kubectl apply -f -
+  kubectl patch validatingwebhookconfiguration agent-warden \
+    --type=json -p="[{\"op\":\"replace\",\"path\":\"/webhooks/0/clientConfig/caBundle\",\"value\":\"$(cat tls/ca.b64)\"}]"
+
+In production, use cert-manager instead.
+{{- end }}
+
+Try the demo:
+  kubectl apply -f examples/00-demo-namespace.yaml
+  kubectl apply -f examples/01-safe-agent.yaml
+  kubectl apply -f examples/02-pocketos-replay.yaml
+
+View blocked actions:
+  kubectl get blockedactions -A
+
+Approval dashboard:
+  kubectl -n {{ .Values.namespace.name }} port-forward svc/dashboard 8080:80
+  open http://localhost:8080

@@ -1,0 +1,27 @@
+apiVersion: agent-warden.io/v1alpha1
+kind: ScopedAgent
+metadata:
+  name: borderline-deploy-bot
+  namespace: agent-warden-demo
+spec:
+  task: "attempt a borderline production patch that should require human approval"
+  image: curlimages/curl:8.10.1
+  command: ["sh", "-c"]
+  args:
+    - |
+      set -e
+      echo "agent ${AGENT_NAME} requesting a borderline action..."
+      RESPONSE=$(curl -sS -X POST "${GUARDRAILS_URL}/decide" \
+        -H 'Content-Type: application/json' \
+        -d '{"verb":"patch","resource":"deployment","target":"checkout-service","namespace":"production","agent_name":"'"${AGENT_NAME}"'","agent_max_irreversibility":'"${AGENT_MAX_IRREVERSIBILITY}"',"agent_max_blast_radius":'"${AGENT_MAX_BLAST_RADIUS}"'}')
+      echo "guardrails verdict:"
+      echo "${RESPONSE}"
+      echo "${RESPONSE}" | grep -q '"verdict":"require_approval"' && echo "REQUIRES APPROVAL as expected" || (echo "UNEXPECTED VERDICT" && exit 1)
+      echo
+      echo "Open 'make dashboard' to approve or deny this request."
+  maxIrreversibility: 6
+  maxBlastRadius: 60
+  allowedTools: []
+  allowedEgressHosts: []
+  timeoutSeconds: 60
+  ttlSecondsAfterFinished: 600

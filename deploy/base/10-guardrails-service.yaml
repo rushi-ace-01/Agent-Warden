@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guardrails-service
+  namespace: agent-warden-system
+  labels:
+    app.kubernetes.io/name: agent-warden
+    app.kubernetes.io/component: guardrails-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: guardrails-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-warden
+        app.kubernetes.io/component: guardrails-service
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: guardrails-service
+          image: agent-warden/guardrails-service:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 1
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guardrails-service
+  namespace: agent-warden-system
+  labels:
+    app.kubernetes.io/name: agent-warden
+    app.kubernetes.io/component: guardrails-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "80"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: guardrails-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

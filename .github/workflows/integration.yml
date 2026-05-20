@@ -1,0 +1,98 @@
+name: integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: e2e on kind
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[guardrails-service,operator,admission-webhook,dashboard,dev]"
+
+      - name: Create cluster
+        run: make cluster
+
+      - name: Deploy
+        run: make deploy
+
+      - name: Run demo
+        run: make demo
+
+      - name: Assert a BlockedAction was recorded
+        # The pocketos-replay job calls /decide directly, which doesn't go through
+        # the admission webhook. So we don't expect a BlockedAction from it.
+        # Instead, the integration test creates one directly via the webhook:
+        run: |
+          set -e
+          echo "Triggering an action the webhook should deny..."
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: rogue-config
+            namespace: agent-warden-demo
+            labels:
+              agent-warden.io/scoped-agent: log-triage
+            annotations:
+              agent-warden.io/max-irreversibility: "0"
+              agent-warden.io/max-blast-radius: "0"
+          data:
+            value: "test"
+          EOF
+
+          # Brief wait, then check for the BlockedAction.
+          sleep 5
+          BA_COUNT=$(kubectl get blockedactions -A --no-headers 2>/dev/null | wc -l)
+          if [ "$BA_COUNT" -lt 1 ]; then
+            echo "::error::expected at least one BlockedAction; got $BA_COUNT"
+            kubectl get events -A --sort-by='.lastTimestamp' | tail -20
+            kubectl -n agent-warden-system logs deploy/admission-webhook | tail -50
+            exit 1
+          fi
+          kubectl get blockedactions -A
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          mkdir -p /tmp/logs
+          for ns in agent-warden-system agent-warden-demo; do
+            kubectl -n "$ns" get all -o wide > "/tmp/logs/${ns}-resources.txt" || true
+            for pod in $(kubectl -n "$ns" get pods -o name 2>/dev/null); do
+              kubectl -n "$ns" logs "$pod" --all-containers > "/tmp/logs/${ns}-${pod//\//-}.log" 2>&1 || true
+            done
+          done
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: /tmp/logs

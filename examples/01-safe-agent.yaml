@@ -1,0 +1,25 @@
+apiVersion: agent-warden.io/v1alpha1
+kind: ScopedAgent
+metadata:
+  name: log-triage
+  namespace: agent-warden-demo
+spec:
+  task: "summarize errors from /var/log and ping guardrails for self-check"
+  image: curlimages/curl:8.10.1
+  command: ["sh", "-c"]
+  args:
+    - |
+      set -e
+      echo "agent ${AGENT_NAME} starting: ${AGENT_TASK}"
+      echo "self-check: scoring a 'get pod' action..."
+      curl -sS -X POST "${GUARDRAILS_URL}/decide" \
+        -H 'Content-Type: application/json' \
+        -d '{"verb":"get","resource":"pod","target":"frontend-7d9c4b","namespace":"staging","agent_name":"'"${AGENT_NAME}"'","agent_max_irreversibility":'"${AGENT_MAX_IRREVERSIBILITY}"',"agent_max_blast_radius":'"${AGENT_MAX_BLAST_RADIUS}"'}'
+      echo
+      echo "done."
+  maxIrreversibility: 4
+  maxBlastRadius: 30
+  allowedTools: []
+  allowedEgressHosts: []
+  timeoutSeconds: 60
+  ttlSecondsAfterFinished: 300

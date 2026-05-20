@@ -1,0 +1,69 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: agent-warden
+  labels:
+    app.kubernetes.io/name: agent-warden
+    app.kubernetes.io/component: admission-webhook
+webhooks:
+  - name: validate.agent-warden.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: NoneOnDryRun
+    # Ignore lets cluster operations proceed if the webhook is down. This
+    # is a deliberate trade-off for the demo: we'd rather have a permissive
+    # failure than freeze the cluster. Production hardening should set
+    # failurePolicy: Fail and add an HA replica set.
+    failurePolicy: Ignore
+    timeoutSeconds: 5
+    matchPolicy: Equivalent
+    # CRITICAL: objectSelector limits the webhook to objects carrying the
+    # agent label. Without this, every cluster operation would route
+    # through us. The label is set by the operator on every resource
+    # it creates from a ScopedAgent.
+    objectSelector:
+      matchExpressions:
+        - key: agent-warden.io/scoped-agent
+          operator: Exists
+    # Exclude our own system namespace so the webhook can never block
+    # the operator/webhook/guardrails from operating on each other.
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values: ["agent-warden-system", "kube-system"]
+    rules:
+      - operations: ["CREATE", "UPDATE", "DELETE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources:
+          - pods
+          - persistentvolumeclaims
+          - secrets
+          - configmaps
+          - services
+      - operations: ["CREATE", "UPDATE", "DELETE"]
+        apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        resources:
+          - deployments
+          - statefulsets
+          - daemonsets
+      - operations: ["CREATE", "UPDATE", "DELETE"]
+        apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        resources:
+          - jobs
+          - cronjobs
+      - operations: ["CREATE", "UPDATE", "DELETE"]
+        apiGroups: ["networking.k8s.io"]
+        apiVersions: ["v1"]
+        resources:
+          - networkpolicies
+    clientConfig:
+      service:
+        name: admission-webhook
+        namespace: {{ .Values.namespace.name }}
+        path: /validate
+        port: 443
+      # caBundle is patched in by `make deploy` after generating certs.
+      caBundle: ""
