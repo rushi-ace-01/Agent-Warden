@@ -10,7 +10,7 @@ to the operator's IP range or behind kubectl port-forward.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -55,7 +55,7 @@ def _list_aars() -> list[dict[str, Any]]:
         )
         items = result.get("items", []) if isinstance(result, dict) else []
         return list(items)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.error("failed to list AARs: %s", e)
         return []
 
@@ -91,7 +91,7 @@ def _decide(namespace: str, name: str, *, phase: str) -> None:
     """Patch the AAR's status to Approved or Denied."""
     try:
         custom = _custom_objects_api()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         custom.patch_namespaced_custom_object_status(
             group="agent-warden.io",
             version="v1alpha1",
@@ -107,7 +107,7 @@ def _decide(namespace: str, name: str, *, phase: str) -> None:
                 }
             },
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.error("failed to patch AAR %s/%s: %s", namespace, name, e)
         raise HTTPException(status_code=500, detail="patch failed") from e
 
