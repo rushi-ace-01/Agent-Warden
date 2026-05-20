@@ -6,7 +6,7 @@ pattern as build_blocked_action: no I/O here.
 """
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from admission_webhook.app.hashing import action_hash
@@ -37,7 +37,7 @@ def build_action_request(
     still exists results in a duplicate-name conflict the webhook can
     interpret as 'already pending, just deny'.
     """
-    timestamp = now or datetime.now(timezone.utc)
+    timestamp = now or datetime.now(UTC)
     expires_at = timestamp + timedelta(minutes=window_minutes)
     h = action_hash(request)
 
