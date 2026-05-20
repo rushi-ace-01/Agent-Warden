@@ -14,7 +14,7 @@ Run with:
   kopf run -A agent_operator.scoped_agent.handlers
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Any
 
 import kopf
@@ -178,7 +178,7 @@ def expire_action_request(
         logger.warning("AAR %s/%s has unparseable expiresAt %r", namespace, name, expires_at_raw)
         return
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if expires_at >= now:
         return
 
